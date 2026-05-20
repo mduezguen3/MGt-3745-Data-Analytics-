@@ -1,0 +1,217 @@
+# generate_report.py
+
+html_content = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Group Project 2 — Data Analytics</title>
+<style>
+body {
+    font-family: Arial, sans-serif;
+    margin: 40px;
+    line-height: 1.6;
+    color: #222;
+}
+h1, h2, h3 {
+    color: #2c3e50;
+}
+hr {
+    margin: 25px 0;
+}
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 20px 0;
+}
+th, td {
+    border: 1px solid #ccc;
+    padding: 8px;
+}
+th {
+    background-color: #f4f4f4;
+}
+code {
+    background: #f8f8f8;
+    padding: 6px;
+    display: block;
+    white-space: pre-wrap;
+    border-left: 4px solid #3498db;
+}
+.inline-code {
+    background: #f2f2f2;
+    padding: 2px 4px;
+    font-family: Consolas, monospace;
+}
+</style>
+</head>
+<body>
+
+<h1>Group Project 2 — Data Analytics</h1>
+<h2>Marketing Track: Boston Airbnb</h2>
+<h3>MGT-3745, Spring 2026</h3>
+
+<hr>
+
+<h2>Team</h2>
+
+<p>List team member names here and who presented which component:</p>
+
+<table>
+<tr><th>Component</th><th>Presenter</th></tr>
+<tr><td>1 — Data Cleaning</td><td>[Mert Duezguen]</td></tr>
+<tr><td>2 — Text Analysis</td><td>[Mert Duezguen]</td></tr>
+<tr><td>3 — Data Wrangling</td><td>[Michelle Y. Yap]</td></tr>
+<tr><td>4 — Visualizations</td><td>[Navaja H. Varma]</td></tr>
+<tr><td>5 — Regression</td><td>[Turner G. Davis]</td></tr>
+<tr><td>Causality Segment</td><td>[Sean Peck]</td></tr>
+</table>
+
+<hr>
+
+<h2>How to run</h2>
+
+<h3>Requirements</h3>
+
+<p>Install dependencies before running:</p>
+
+<code>pip install pandas numpy matplotlib seaborn vaderSentiment scikit-learn statsmodels scipy</code>
+
+<p>Python 3.9 or higher recommended.</p>
+
+<h3>Setup</h3>
+
+<ol>
+<li>Open <span class="inline-code">boston_airbnb_analysis.py</span> in VS Code (or any editor).</li>
+<li>Update <span class="inline-code">BASE_DIR</span> at the top of the file to the folder on your machine that contains the <span class="inline-code">listings/</span>, <span class="inline-code">reviews/</span>, and <span class="inline-code">calendar/</span> subfolders.</li>
+<li>Run the script:</li>
+</ol>
+
+<code>python boston_airbnb_analysis.py</code>
+
+<p>Runtime with <span class="inline-code">SCRAPE_STRIDE = 4</span> (every 4th scrape): approximately 5-15 minutes depending on machine, mostly VADER and LDA.</p>
+
+<p>To run on the full dataset set <span class="inline-code">SCRAPE_STRIDE = 1</span> at the top of the script.</p>
+
+<h3>Outputs</h3>
+
+<p>All figures and tables are saved to an <span class="inline-code">outputs/</span> subfolder inside <span class="inline-code">BASE_DIR</span>. The script will create this folder if it does not exist.</p>
+
+<hr>
+
+<h2>Data files used</h2>
+
+<h3>City</h3>
+<p>Boston, MA (Inside Airbnb)</p>
+
+<h3>Listings folder</h3>
+<p>Path: <span class="inline-code">listings/</span></p>
+
+<p>All files matching <span class="inline-code">listings_*.csv</span>. The script loads every 4th file (controlled by <span class="inline-code">SCRAPE_STRIDE</span>). Files used span the full available scrape window. Exact file list and date range are printed to console at runtime under the DATA VALIDATION section.</p>
+
+<p>Representative filename pattern: <span class="inline-code">listings_2022-06-18.csv</span></p>
+
+<p><b>Key columns used:</b> id, host_id, host_since, host_is_superhost, host_listings_count, host_total_listings_count, neighbourhood_cleansed, latitude, longitude, property_type, room_type, accommodates, bedrooms, beds, bathrooms_text, price, minimum_nights, maximum_nights, has_availability, availability_30, availability_60, availability_90, availability_365, number_of_reviews, number_of_reviews_ltm, number_of_reviews_l30d, first_review, last_review, review_scores_rating, review_scores_accuracy, review_scores_cleanliness, review_scores_checkin, review_scores_communication, review_scores_location, review_scores_value, reviews_per_month, instant_bookable, calculated_host_listings_count</p>
+
+<h3>Reviews folder</h3>
+<p>Path: <span class="inline-code">reviews/</span></p>
+
+<p>All files matching <span class="inline-code">reviews_*.csv</span>. Inside Airbnb review exports are cumulative — each file contains all reviews up to that scrape date. We load all files and deduplicate by <span class="inline-code">review.id</span> to ensure each review is counted once.</p>
+
+<p><b>Key columns used:</b> listing_id, id, date, comments</p>
+
+<h3>Calendar folder</h3>
+<p>Path: <span class="inline-code">calendar/</span></p>
+
+<p>Calendar files are available but not loaded directly. Each calendar CSV is 200-400 MB (one row per listing per night for a 365-day window). We derive the occupancy and revenue proxies from <span class="inline-code">availability_30</span> in the listings snapshots, which already summarizes the same information at the 30-day window level. This decision is documented and printed in the script output under Component 3.</p>
+
+<hr>
+
+<h2>Variable construction</h2>
+
+<h3>Occupancy proxy</h3>
+<p><span class="inline-code">occupancy_proxy_30 = 1 - (availability_30 / 30)</span>, clipped to [0, 1].</p>
+
+<p><span class="inline-code">availability_30</span> is the number of days in the next 30-day window that are listed as available. One minus that fraction gives an estimated occupancy rate for the window.</p>
+
+<p>Limitations: does not distinguish host-blocked nights from guest-booked nights; does not capture dynamic nightly pricing or discounts; availability may lag actual bookings depending on host calendar management.</p>
+
+<h3>Revenue proxy</h3>
+<p><span class="inline-code">revenue_proxy_30 = price_num × (30 - availability_30)</span>.</p>
+
+<p>Estimated gross revenue over 30 days, assuming the listed price applies to all booked nights.</p>
+
+<p>Limitations: actual revenue will differ from advertised price due to discounts, cleaning fees, and length-of-stay pricing rules.</p>
+
+<h3>Reputation index</h3>
+
+<p>Composite of two standardized signals:</p>
+<ul>
+<li><span class="inline-code">review_scores_rating_z</span>: z-score of the structured star rating</li>
+<li><span class="inline-code">cum_mean_sentiment_z</span>: z-score of the cumulative VADER compound score across all reviews</li>
+</ul>
+
+<p><span class="inline-code">reputation_index = mean(review_scores_rating_z, cum_mean_sentiment_z)</span></p>
+
+<p>Both components are standardized first so neither dominates due to scale differences.</p>
+
+<hr>
+
+<h2>Key modeling decisions</h2>
+
+<p><b>Unit of observation:</b> listing × scrape_date (listing-time panel)</p>
+
+<p><b>Cross-section for main regression:</b> most recent scrape per listing, to avoid serial correlation from repeated observations in pooled OLS without listing fixed effects.</p>
+
+<p><b>Sentiment aggregation level:</b> listing × calendar month, matched to scrape month for the panel merges.</p>
+
+<p><b>Scrape sampling:</b> every 4th available scrape date (<span class="inline-code">SCRAPE_STRIDE = 4</span>). Justified by runtime and the fact that listings change slowly across adjacent scrapes.</p>
+
+<p><b>Review deduplication:</b> Inside Airbnb re-exports all reviews in each snapshot. We deduplicate by <span class="inline-code">review.id</span> before sentiment scoring.</p>
+
+<hr>
+
+<h2>Output files</h2>
+
+<table>
+<tr><th>File</th><th>Description</th></tr>
+<tr><td><span class="inline-code">panel_analysis_ready.csv</span></td><td>Full listing-time panel with all constructed variables</td></tr>
+<tr><td><span class="inline-code">regression_table.csv</span></td><td>6-model regression table (coefficients, SE, stars)</td></tr>
+<tr><td><span class="inline-code">panel_regression_summary.csv</span></td><td>Pooled OLS vs. Listing FE vs. Two-Way FE comparison</td></tr>
+<tr><td><span class="inline-code">fig1_price_by_room_type.png</span></td><td>Price distribution by room type</td></tr>
+<tr><td><span class="inline-code">fig2_sentiment_distribution.png</span></td><td>VADER sentiment histogram</td></tr>
+<tr><td><span class="inline-code">fig3_sentiment_over_time.png</span></td><td>Mean sentiment by month</td></tr>
+<tr><td><span class="inline-code">fig4_rating_vs_price.png</span></td><td>Review score vs. nightly price scatter</td></tr>
+<tr><td><span class="inline-code">fig5_sentiment_vs_occupancy.png</span></td><td>Sentiment vs. occupancy proxy scatter</td></tr>
+<tr><td><span class="inline-code">fig6_reputation_by_neighbourhood.png</span></td><td>Mean reputation index by neighbourhood</td></tr>
+<tr><td><span class="inline-code">fig7_lda_topic_distribution.png</span></td><td>Listing count by dominant LDA topic</td></tr>
+<tr><td><span class="inline-code">fig8_sentiment_by_room_type.png</span></td><td>Sentiment label share by room type</td></tr>
+<tr><td><span class="inline-code">fig9_occupancy_by_host_tier.png</span></td><td>Occupancy proxy by host tenure tier</td></tr>
+<tr><td><span class="inline-code">fig10_correlation_heatmap.png</span></td><td>Correlation heatmap of key variables</td></tr>
+<tr><td><span class="inline-code">fig11_coef_plot.png</span></td><td>Coefficient plot for Model 3</td></tr>
+<tr><td><span class="inline-code">fig12_partial_regression.png</span></td><td>Partial regression: reputation vs. log(price)</td></tr>
+<tr><td><span class="inline-code">fig13_within_listing_price_variation.png</span></td><td>Within-listing price variation over time</td></tr>
+<tr><td><span class="inline-code">fig14_price_by_scrape_quarter.png</span></td><td>log(price) by scrape quarter</td></tr>
+<tr><td><span class="inline-code">fig15_subsample_ols_superhost.png</span></td><td>Two OLS lines by superhost status</td></tr>
+</table>
+
+<hr>
+
+<h2>AI transparency</h2>
+
+<table>
+<tr><th>Component</th><th>How AI was used</th></tr>
+<tr><td>1 — Data Cleaning</td><td>Claude (chat) helped think through cleaning rules. All pandas code written and tested by us.</td></tr>
+<tr><td>2 — Text Analysis</td><td>Claude (chat) explained VADER and LDA at a high level. We wrote the vectorizer setup, LDA fitting, and all aggregation.</td></tr>
+<tr><td>3 — Data Wrangling</td><td>Claude (coding agent) gave us a starting skeleton for the merges. We verified every join and variable by hand.</td></tr>
+<tr><td>4 — Visualizations</td><td>Claude (chat) suggested some figure types. All design choices and axis labels done by us.</td></tr>
+<tr><td>5 — Regression</td><td>Claude (chat) suggested some model specs to consider. All interpretation is ours.</td></tr>
+</table>
+
+</body>
+</html>
+"""
+
+with open("report.html", "w", encoding="utf-8") as f:
+    f.write(html_content)
+
+print("report.html created successfully.")
